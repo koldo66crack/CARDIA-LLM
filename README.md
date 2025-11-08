@@ -2,6 +2,10 @@
 
 Lightweight Retrieval-Augmented Generation system for querying BIOLINCC data dictionaries. This system enables researchers to semantically search across thousands of CARDIA study variables using natural language queries, powered by AI-assisted semantic retrieval and multi-turn conversational AI.
 
+## Disclaimer
+
+All of the data used for this project is publicly available at https://www.cardia.dopm.uab.edu/study-information/nhlbi-data-repository-data/cardia-documentation. The information fed to the LLM consists of variable reports with metadata, not the actual entries.
+
 ## Purpose
 
 Enable researchers to efficiently discover and understand variables in the CARDIA study by:
