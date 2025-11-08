@@ -1,0 +1,10 @@
+{
+  "total_chunks": 16511,
+  "datasets": 441,
+  "variable_types": {
+    "Num": 15985,
+    "Char": 526
+  },
+  "chunks_with_labels": 16050,
+  "output_file": "data/processed\\biolincc_data_dictionary.jsonl"
+}
