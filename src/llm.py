@@ -65,9 +65,8 @@ def generate_response(user_query: str, chat_session: ChatSession, similarity_thr
     
     Pipeline:
     1. Generate optimized RAG query from user query
-    2. Retrieve semantically similar chunks
-    3. Check if any chunks exceed similarity threshold
-    4. Send to LLM via ChatSession with optional reference material
+    2. Retrieve semantically similar chunks (filtered by threshold)
+    3. Send to LLM via ChatSession with optional reference material
     
     Args:
         user_query (str): User's question
@@ -85,20 +84,15 @@ def generate_response(user_query: str, chat_session: ChatSession, similarity_thr
         
         # Step 2: Retrieve relevant chunks
         print(f"Searching for relevant variables...")
-        chunks = search_variables(rag_query, k=10, verbose=False)
+        chunks = search_variables(rag_query, k=10, similarity_threshold=similarity_threshold, verbose=False)
         
-        # Step 3: Check threshold - are there chunks above the threshold?
+        # Step 3: Format retrieved context if chunks found
         reference_context = None
         if chunks:
-            max_score = max(chunk.get('similarity_score', 0) for chunk in chunks)
-            if max_score >= similarity_threshold:
-                # YES - include formatted chunks as reference material
-                reference_context = build_retrieved_context(chunks, user_query)
-                print(f"Found {len(chunks)} relevant variables above threshold ({similarity_threshold})")
-            else:
-                print(f"No chunks above threshold ({similarity_threshold}). Proceeding without retrieved context.")
+            reference_context = build_retrieved_context(chunks, user_query)
+            print(f"Found {len(chunks)} relevant variables above threshold ({similarity_threshold})")
         else:
-            print("No relevant variables found in retrieval.")
+            print(f"No relevant variables found above threshold ({similarity_threshold}). Proceeding without retrieved context.")
         
         # Step 4: Send to LLM with optional reference material
         print("Generating response...")

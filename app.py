@@ -21,12 +21,26 @@ def load_system_instructions():
         return f.read()
 
 
-def initialize_chat_session():
-    """Initialize a new chat session with Gemini."""
+def initialize_chat_session(provider: str = "openai", model_name: str = None):
+    """
+    Initialize a new chat session with the specified provider and model.
+    
+    Args:
+        provider (str): LLM provider ('gemini' or 'openai'). Defaults to 'openai'.
+        model_name (str): Model name for the provider. If None, uses default for that provider.
+    """
     system_instructions = load_system_instructions()
+    
+    # Set default model names if not provided
+    if model_name is None:
+        if provider == "openai":
+            model_name = "gpt-4o-mini"
+        else:
+            model_name = "gemini-2.0-flash-exp"
+    
     return ChatSession(
-        provider="gemini",
-        model_name="gemini-2.0-flash-exp",
+        provider=provider,
+        model_name=model_name,
         system_instruction=system_instructions
     )
 
@@ -49,11 +63,47 @@ st.markdown("Ask me about variables in the CARDIA study!")
 # ─────────────────────────────────────────────────────────────
 
 with st.sidebar:
+    st.markdown("## Model Selection")
+    
+    # Model provider selection
+    provider = st.selectbox(
+        "Choose LLM Provider",
+        ["OpenAI", "Gemini"],
+        help="Select which LLM provider to use for generating responses"
+    )
+    provider_lower = provider.lower()
+    
+    # Set model name based on provider
+    if provider_lower == "openai":
+        model_name = "gpt-4o-mini"
+        st.caption("📌 Model: gpt-4o-mini")
+    else:
+        model_name = "gemini-2.0-flash-exp"
+        st.caption("📌 Model: gemini-2.0-flash-exp")
+    
+    st.markdown("---")
     st.markdown("## Chat Controls")
+    
     if st.button("🔄 Start New Chat"):
         st.session_state.messages = []
-        st.session_state.chat_session = initialize_chat_session()
+        st.session_state.chat_session = initialize_chat_session(
+            provider=provider_lower, 
+            model_name=model_name
+        )
+        st.session_state.current_provider = provider_lower
+        st.session_state.current_model = model_name
         st.rerun()  # Refresh page to show empty chat
+    
+    st.markdown("## RAG Settings")
+    similarity_threshold = st.slider(
+        "Similarity Threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.75,
+        step=0.05,
+        help="Minimum similarity score for retrieving relevant variables (0.0-1.0)"
+    )
+    st.session_state.similarity_threshold = similarity_threshold
 
 # ─────────────────────────────────────────────────────────────
 # SESSION STATE INITIALIZATION
@@ -61,8 +111,17 @@ with st.sidebar:
 # Session state persists data across page reruns (when user interacts)
 # Without it, chat history would disappear on every interaction
 
+if "current_provider" not in st.session_state:
+    st.session_state.current_provider = "gemini"
+
+if "current_model" not in st.session_state:
+    st.session_state.current_model = "gemini-2.0-flash-exp"
+
 if "chat_session" not in st.session_state:
-    st.session_state.chat_session = initialize_chat_session()
+    st.session_state.chat_session = initialize_chat_session(
+        provider=st.session_state.current_provider,
+        model_name=st.session_state.current_model
+    )
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -93,7 +152,11 @@ if prompt := st.chat_input("Ask me about CARDIA variables..."):
     with st.chat_message("assistant"):
         with st.spinner("Searching CARDIA database and generating response..."):
             try:
-                response = generate_response(prompt, st.session_state.chat_session)
+                response = generate_response(
+                    prompt, 
+                    st.session_state.chat_session,
+                    similarity_threshold=st.session_state.similarity_threshold
+                )
                 st.write(response)
                 
                 # Add assistant response to session state history

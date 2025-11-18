@@ -96,7 +96,7 @@ def search_index(index, metadata, model, query, k, similarity_threshold=0.7):
     return results
 
 
-def search_variables(query, k=1000, similarity_threshold=0.7, index_dir="data/processed", verbose=False):
+def search_variables(query, k=200, similarity_threshold=0.7, index_dir="data/processed", verbose=False):
     """
     Search for variables matching the user query.
     
