@@ -1,5 +1,7 @@
 # CARDIA RAG System
 
+# [View the live app here](https://cardia-llm.streamlit.app/)
+
 Lightweight Retrieval-Augmented Generation system for querying BIOLINCC data dictionaries. This system enables researchers to semantically search across thousands of CARDIA study variables using natural language queries, powered by AI-assisted semantic retrieval and multi-turn conversational AI.
 
 ## Disclaimer
