@@ -9,6 +9,9 @@ import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Tuple, Optional
+import json
+from datetime import datetime
+from collections import defaultdict
 
 
 def load_existing_index(index_dir="data/processed", verbose=False):
@@ -96,7 +99,55 @@ def search_index(index, metadata, model, query, k, similarity_threshold=0.7):
     return results
 
 
-def search_variables(query, k=200, similarity_threshold=0.7, index_dir="data/processed", verbose=False):
+def search_by_tags(tags: List[str], metadata: List[Dict]) -> List[Dict]:
+    """
+    Search for chunks matching extracted tags (case-insensitive substring match).
+    Searches across variable_name, dataset, and label fields.
+    
+    Args:
+        tags (List[str]): Extracted tags/identifiers to search for (e.g., ["aachem", "AL3CREAT", "creatinine"])
+        metadata (List[Dict]): All available metadata chunks
+        
+    Returns:
+        list: List of matching chunks with 'match_type' field indicating where match occurred
+    """
+    if not tags:
+        return []
+    
+    results = []
+    seen_indices = set()  # Avoid duplicates if multiple tags match same chunk
+    
+    for tag in tags:
+        tag_lower = tag.lower()
+        for idx, chunk in enumerate(metadata):
+            if idx in seen_indices:
+                continue
+            
+            # Check if tag matches in variable_name, dataset, or label (case-insensitive substring)
+            variable_name = chunk.get('variable_name', '').lower()
+            dataset = chunk.get('dataset', '').lower()
+            label = chunk.get('label', '').lower()
+            
+            match_type = None
+            if tag_lower in variable_name:
+                match_type = 'variable_name'
+            elif tag_lower in dataset:
+                match_type = 'dataset'
+            elif tag_lower in label:
+                match_type = 'label'
+            
+            if match_type:
+                chunk_copy = chunk.copy()
+                chunk_copy['match_type'] = match_type
+                chunk_copy['matched_tag'] = tag
+                chunk_copy['keyword_score'] = 1.0
+                results.append(chunk_copy)
+                seen_indices.add(idx)
+    
+    return results
+
+
+def search_variables(query, k=100, similarity_threshold=0.7, index_dir="data/processed", verbose=False):
     """
     Search for variables matching the user query.
     
@@ -135,6 +186,18 @@ def search_variables(query, k=200, similarity_threshold=0.7, index_dir="data/pro
                   f"- Score: {result.get('similarity_score', 0):.3f}")
             if result.get('label'):
                 print(f"   Description: {result['label']}")
+    
+    # Save retrieved chunks to JSON for debugging
+    debug_log = {
+        "timestamp": datetime.now().isoformat(),
+        "query": query,
+        "threshold": similarity_threshold,
+        "num_retrieved": len(results),
+        "chunks": results
+    }
+    os.makedirs("data/debug", exist_ok=True)
+    with open("data/debug/retrieved_chunks.json", "w", encoding="utf-8") as f:
+        json.dump(debug_log, f, indent=2, ensure_ascii=False)
     
     return results
 
