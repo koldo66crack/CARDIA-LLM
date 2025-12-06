@@ -1,4 +1,3 @@
-
 """
 Conversation management with provider-agnostic LLM interface.
 Supports multiple LLM providers (Gemini, OpenAI, Claude) with unified conversation history.
@@ -7,6 +6,9 @@ Supports multiple LLM providers (Gemini, OpenAI, Claude) with unified conversati
 import os
 from typing import List, Dict
 from dotenv import load_dotenv
+import google.generativeai as genai
+from openai import OpenAI
+import anthropic
 
 # Load environment variables from .env file
 load_dotenv()
@@ -48,11 +50,6 @@ class ChatSession:
     
     def _initialize_gemini(self):
         """Initialize and return Gemini model with system instruction."""
-        try:
-            import google.generativeai as genai
-        except ImportError:
-            raise ImportError("google-generativeai not installed. Run: pip install google-generativeai")
-        
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             raise ValueError("GEMINI_API_KEY not found in environment variables. Please set it in .env file.")
@@ -65,20 +62,10 @@ class ChatSession:
     
     def _initialize_openai(self):
         """Initialize and return OpenAI client."""
-        try:
-            from openai import OpenAI
-        except ImportError:
-            raise ImportError("openai not installed. Run: pip install openai")
-        
         return OpenAI()
     
     def _initialize_claude(self):
         """Initialize and return Anthropic (Claude) client."""
-        try:
-            import anthropic
-        except ImportError:
-            raise ImportError("anthropic not installed. Run: pip install anthropic")
-        
         return anthropic.Anthropic()
     
     def send(self, user_msg: str, reference_context: str = None) -> str:

@@ -9,13 +9,14 @@ import os
 from pathlib import Path
 
 
-def preprocess_biolincc_csv(csv_path, output_dir="data/processed"):
+def preprocess_biolincc_csv(csv_path, output_dir="data/processed", study_type="main"):
     """
     Convert BIOLINCC CSV data dictionary to JSONL format.
     
     Args:
         csv_path (str): Path to the input CSV file
         output_dir (str): Directory to save the processed JSONL file
+        study_type (str): Type of study - "main" or "ancillary"
     """
     # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
@@ -53,6 +54,7 @@ def preprocess_biolincc_csv(csv_path, output_dir="data/processed"):
         # Create a comprehensive chunk for each variable
         chunk = {
             "id": f"cardia_var_{idx:06d}",
+            "study": study_type,
             "dataset": row["Dataset"],
             "variable_name": row["Variable_Name"],
             "label": row["Label"] if pd.notna(row["Label"]) else "",
@@ -72,7 +74,8 @@ def preprocess_biolincc_csv(csv_path, output_dir="data/processed"):
             
             # Add metadata for filtering and retrieval
             "metadata": {
-                "source": "BIOLINCC_Main_Study_Data_Dictionary",
+                "source": "BIOLINCC_Main_Study_Data_Dictionary" if study_type == "main" else "BIOLINCC_Ancillary_Studies_Data_Dictionary",
+                "study": study_type,
                 "dataset": row["Dataset"],
                 "variable_type": row["Type"],
                 "has_label": pd.notna(row["Label"]) and row["Label"] != "",
@@ -82,22 +85,42 @@ def preprocess_biolincc_csv(csv_path, output_dir="data/processed"):
         
         chunks.append(chunk)
     
+    # Return chunks and metadata for combined processing
+    return chunks, df
+
+
+def save_combined_jsonl(all_chunks, all_dataframes, output_dir="data/processed"):
+    """
+    Save combined chunks from both main and ancillary studies to JSONL with unified IDs.
+    
+    Args:
+        all_chunks (list): Combined list of all chunks from all studies
+        all_dataframes (list): List of dataframes used for summary statistics
+        output_dir (str): Directory to save the processed JSONL file
+    """
+    # Reassign IDs to ensure they're sequential across both datasets
+    for idx, chunk in enumerate(all_chunks):
+        chunk["id"] = f"cardia_var_{idx:06d}"
+    
     # Save as JSONL
     output_path = os.path.join(output_dir, "biolincc_data_dictionary.jsonl")
     
     with open(output_path, 'w', encoding='utf-8') as f:
-        for chunk in chunks:
+        for chunk in all_chunks:
             f.write(json.dumps(chunk, ensure_ascii=False) + '\n')
     
-    print(f"Saved {len(chunks)} chunks to {output_path}")
+    print(f"Saved {len(all_chunks)} chunks to {output_path}")
     
-    # Also save a summary
+    # Create summary statistics
+    combined_df = pd.concat(all_dataframes, ignore_index=True)
     summary_path = os.path.join(output_dir, "preprocessing_summary.json")
     summary = {
-        "total_chunks": len(chunks),
-        "datasets": df["Dataset"].nunique(),
-        "variable_types": df["Type"].value_counts().to_dict(),
-        "chunks_with_labels": sum(1 for chunk in chunks if chunk["metadata"]["has_label"]),
+        "total_chunks": len(all_chunks),
+        "main_study_chunks": len([c for c in all_chunks if c["study"] == "main"]),
+        "ancillary_study_chunks": len([c for c in all_chunks if c["study"] == "ancillary"]),
+        "datasets": combined_df["Dataset"].nunique(),
+        "variable_types": combined_df["Type"].value_counts().to_dict(),
+        "chunks_with_labels": sum(1 for chunk in all_chunks if chunk["metadata"]["has_label"]),
         "output_file": output_path
     }
     
@@ -150,12 +173,42 @@ def create_searchable_content(row):
 
 
 if __name__ == "__main__":
-    # Process the main BIOLINCC data dictionary
-    csv_path = "data/raw/BIOLINCC_Main Study Data Dictionary.csv"
+    # Process both BIOLINCC main study and ancillary studies
+    all_chunks = []
+    all_dataframes = []
     
-    if os.path.exists(csv_path):
-        output_path = preprocess_biolincc_csv(csv_path)
+    # Process main study
+    main_study_csv = "data/raw/BIOLINCC_Main Study Data Dictionary.csv"
+    if os.path.exists(main_study_csv):
+        print("\n" + "=" * 60)
+        print("PROCESSING MAIN STUDY")
+        print("=" * 60)
+        main_chunks, main_df = preprocess_biolincc_csv(main_study_csv, study_type="main")
+        all_chunks.extend(main_chunks)
+        all_dataframes.append(main_df)
+        print(f"Added {len(main_chunks)} chunks from main study\n")
+    else:
+        print(f"Main study CSV not found at: {main_study_csv}")
+    
+    # Process ancillary studies
+    ancillary_csv = "data/raw/Ancillary Studies Data Dictionary - cleaned.csv"
+    if os.path.exists(ancillary_csv):
+        print("=" * 60)
+        print("PROCESSING ANCILLARY STUDIES")
+        print("=" * 60)
+        ancillary_chunks, ancillary_df = preprocess_biolincc_csv(ancillary_csv, study_type="ancillary")
+        all_chunks.extend(ancillary_chunks)
+        all_dataframes.append(ancillary_df)
+        print(f"Added {len(ancillary_chunks)} chunks from ancillary studies\n")
+    else:
+        print(f"Ancillary studies CSV not found at: {ancillary_csv}")
+    
+    # Save combined JSONL if we have chunks
+    if all_chunks:
+        print("=" * 60)
+        print("SAVING COMBINED JSONL")
+        print("=" * 60)
+        output_path = save_combined_jsonl(all_chunks, all_dataframes)
         print(f"Preprocessing complete! Output saved to: {output_path}")
     else:
-        print(f"CSV file not found at: {csv_path}")
-        print("Please ensure the file exists in the correct location.")
+        print("No chunks to save. Please ensure CSV files exist in data/raw/")

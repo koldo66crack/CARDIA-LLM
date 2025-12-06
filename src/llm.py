@@ -9,8 +9,8 @@ import re
 from typing import Optional, List, Dict
 from dotenv import load_dotenv
 import google.generativeai as genai
-from rag_retriever import search_variables, build_retrieved_context
-from conversation_manager import ChatSession
+from src.rag_retriever import search_variables, build_retrieved_context, search_by_tags, load_existing_index
+from src.conversation_manager import ChatSession
 
 # Load environment variables from .env file
 load_dotenv()
@@ -120,8 +120,6 @@ def generate_response(user_query: str, chat_session: ChatSession, similarity_thr
         str: Generated response from the LLM
     """
     try:
-        from rag_retriever import search_by_tags, load_existing_index
-        
         # Step 1: Generate optimized search query and extract tags
         print(f"Optimizing search query and extracting tags...")
         rag_result = generate_rag_query(user_query, chat_session.get_history())

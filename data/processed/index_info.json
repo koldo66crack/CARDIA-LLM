@@ -1,5 +1,5 @@
 {
-  "total_vectors": 16511,
+  "total_vectors": 44312,
   "embedding_dimension": 384,
   "index_type": "IndexFlatIP",
   "similarity_metric": "cosine",

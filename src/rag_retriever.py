@@ -7,9 +7,9 @@ import os
 import pickle
 import numpy as np
 import faiss
+import json
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Tuple, Optional
-import json
 from datetime import datetime
 from collections import defaultdict
 
@@ -46,7 +46,6 @@ def load_existing_index(index_dir="data/processed", verbose=False):
             metadata = pickle.load(f)
         
         # Load model info
-        import json
         with open(info_path, 'r') as f:
             info = json.load(f)
         model_name = info.get('model_name', 'BAAI/bge-small-en-v1.5')
@@ -223,6 +222,7 @@ def build_retrieved_context(chunks: List[Dict], user_query: str) -> str:
     for i, chunk in enumerate(chunks, 1):
         context_parts.append(f"\n{i}. Variable: {chunk.get('variable_name', 'Unknown')}")
         context_parts.append(f"   Dataset: {chunk.get('dataset', 'Unknown')}")
+        context_parts.append(f"   Study: {chunk.get('study', 'Unknown').capitalize()}")
         
         if chunk.get('label'):
             context_parts.append(f"   Description: {chunk['label']}")

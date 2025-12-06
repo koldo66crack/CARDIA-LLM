@@ -3,13 +3,8 @@
 
 import streamlit as st
 import os
-import sys
-
-# Add src to path so we can import modules from it
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-
-from llm import generate_response
-from conversation_manager import ChatSession
+from src.llm import generate_response
+from src.conversation_manager import ChatSession
 
 
 def load_system_instructions():

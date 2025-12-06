@@ -95,19 +95,14 @@ def generate_embeddings(model, content_strings, batch_size=32):
         np.ndarray: Array of embeddings
     """
     print(f"Generating embeddings for {len(content_strings)} content strings...")
-    print(f"Using batch size: {batch_size}")
+    print(f"Using batch size: {batch_size}\n")
     
-    # Calculate number of batches for progress tracking
-    num_batches = (len(content_strings) + batch_size - 1) // batch_size
-    print(f"Will process {num_batches} batches...")
-    
-    # Process in batches with progress tracking
+    # Process in batches with tqdm progress bar
     all_embeddings = []
-    for i in range(0, len(content_strings), batch_size):
+    batch_indices = range(0, len(content_strings), batch_size)
+    
+    for i in tqdm(batch_indices, desc="Embedding batches", unit="batch"):
         batch = content_strings[i:i + batch_size]
-        batch_num = (i // batch_size) + 1
-        
-        print(f"Processing batch {batch_num}/{num_batches} ({len(batch)} items)...")
         
         # Generate embeddings for this batch
         batch_embeddings = model.encode(
@@ -116,14 +111,10 @@ def generate_embeddings(model, content_strings, batch_size=32):
         )
         
         all_embeddings.append(batch_embeddings)
-        
-        # Show progress
-        progress = (batch_num / num_batches) * 100
-        print(f"Progress: {progress:.1f}% ({batch_num}/{num_batches} batches)")
     
     # Combine all embeddings
     embeddings = np.vstack(all_embeddings)
-    print(f"Generated embeddings with shape: {embeddings.shape}")
+    print(f"\nGenerated embeddings with shape: {embeddings.shape}")
     return embeddings
 
 
@@ -250,7 +241,7 @@ def build_index_from_jsonl(jsonl_path, output_dir="data/processed", model_name="
     print(f"Metadata file: {metadata_path}")
     print(f"Info file: {info_path}")
     
-    return index, metadata, model
+    return index, chunks, model
 
 
 if __name__ == "__main__":
