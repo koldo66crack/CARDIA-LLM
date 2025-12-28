@@ -8,6 +8,7 @@ import json
 import re
 from typing import Optional, List, Dict
 from dotenv import load_dotenv
+from openai import OpenAI
 import google.generativeai as genai
 from src.rag_retriever import search_variables, build_retrieved_context, search_by_tags, load_existing_index
 from src.conversation_manager import ChatSession
@@ -40,8 +41,8 @@ def extract_json_from_response(response_text: str) -> Dict:
 
 def generate_rag_query(user_query: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> Dict[str, any]:
     """
-    Generate an optimized RAG search query and extract tags using Gemini 2.0 Flash.
-    Uses isolated generate_content() call (not part of conversation history).
+    Generate an optimized RAG search query and extract tags using GPT-4o-mini.
+    Uses isolated API call (not part of conversation history).
     
     Returns both the optimized query and extracted tags for keyword matching.
     Always calls LLM to extract tags, but only includes conversation history for follow-ups.
@@ -55,14 +56,12 @@ def generate_rag_query(user_query: str, conversation_history: Optional[List[Dict
               - query: Optimized search query for semantic retrieval
               - tags: Extracted identifiers for keyword matching
     """
-    # Configure Gemini with API key from environment
-    api_key = os.getenv("GEMINI_API_KEY")
+    # Configure OpenAI with API key from environment
+    api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY not found in environment variables. Please set it in .env file.")
-    genai.configure(api_key=api_key)
+        raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in .env file.")
     
-    # Create model for isolated query optimization
-    model = genai.GenerativeModel(model_name="gemini-2.0-flash-exp")
+    client = OpenAI(api_key=api_key)
     
     # Load the optimization prompt template
     prompt_template_path = os.path.join(os.path.dirname(__file__), "rag_query_optimization_prompt.txt")
@@ -84,19 +83,23 @@ def generate_rag_query(user_query: str, conversation_history: Optional[List[Dict
         user_query=user_query
     )
     
-    # Use isolated generate_content call (not part of conversation history)
-    response = model.generate_content(optimization_prompt)
+    # Call OpenAI API with GPT-4o-mini (fast and cost-effective)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": optimization_prompt}],
+        temperature=0.0
+    )
     
     # Parse JSON response
     try:
-        result = extract_json_from_response(response.text)
+        result = extract_json_from_response(response.choices[0].message.content)
         return {
             "query": result.get("query", user_query),
             "tags": result.get("tags", [])
         }
     except (json.JSONDecodeError, KeyError) as e:
         # Fallback if JSON parsing fails
-        print(f"Warning: Failed to parse LLM response as JSON. Response was: {response.text}")
+        print(f"Warning: Failed to parse LLM response as JSON. Response was: {response.choices[0].message.content}")
         return {"query": user_query, "tags": []}
 
 
