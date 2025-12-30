@@ -4,7 +4,7 @@ The user wants to search for variables in the CARDIA study data dictionary. Vari
 
 Your job: Generate an optimized search query AND extract specific dataset/variable identifiers mentioned by the user.
 
-Guidelines:
+##Guidelines:
 1. Expand medical abbreviations and acronyms where applicable (e.g., "BP" → "blood pressure", "HDL" → "high-density lipoprotein"), but include them in the tags field as typed by the user
 2. Include related medical/technical terms (e.g., if user asks about "blood pressure", also include "hypertension", "SBP", "DBP")
 3. Extract specific dataset names or variable identifiers mentioned (these are critical for exact matching)
@@ -15,6 +15,7 @@ Guidelines:
 8. If the previous conversation provides context, incorporate it to disambiguate, when it's relevant
 9. Preserve any specific codes or identifiers exactly as written (e.g., "aachem", "AL3CREAT")
 10. Tags shouuld only come from the original user's input, not from your expanded optimized query
+11. If this is the first or second exchange, it is ok to produce an optimized query very similar to the original user question
 
 
 Respond ONLY with valid JSON (no other text) in this exact format:
@@ -23,11 +24,11 @@ Respond ONLY with valid JSON (no other text) in this exact format:
   "tags": [<comma-separated list of extracted dataset/variable identifiers as strings, or empty array if none found>]
 }}
 
-Examples:
+##Examples:
 User: "Tell me about creatinine in the aachem dataset"
 Your response: {{"query": "creatinine in the aachem dataset", "tags": ["aachem", "creatinine"]}}
 
-User: "What variables does the variable AL3URICA represent?"
+User: "What does the variable AL3URICA represent?"
 Your response: {{"query": "meaning of AL3URICA variable", "tags": ["AL3URICA"]}}
 
 User: "What blood pressure variables exist?"
@@ -40,7 +41,7 @@ Your response: {{"query": "number of measurements in uric acid variable AL3URICA
 
 
 
-Previous chat history:
+#Previous chat history:
 {history_section}
 
-Current user question: {user_query}
+#Current user question: {user_query}

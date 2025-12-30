@@ -87,7 +87,7 @@ def generate_rag_query(user_query: str, conversation_history: Optional[List[Dict
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": optimization_prompt}],
-        temperature=0.0
+        temperature=0.25
     )
     
     # Parse JSON response
