@@ -17,7 +17,7 @@ load_dotenv()
 
 # Prompt file paths
 PROMPTS_DIR = os.path.join(os.path.dirname(__file__), "prompts")
-QUERY_OPTIMIZATION_PROMPT = os.path.join(os.path.dirname(__file__), "rag_query_optimization_prompt.txt")
+QUERY_OPTIMIZATION_PROMPT = os.path.join(PROMPTS_DIR, "rag_query_optimization_prompt.txt")
 SUFFICIENCY_CHECK_PROMPT = os.path.join(PROMPTS_DIR, "sufficiency_check.txt")
 
 

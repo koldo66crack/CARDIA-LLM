@@ -101,7 +101,7 @@ def main():
     print("Type 'quit' to exit.\n")
     
     # Load system instructions
-    instructions_path = os.path.join(os.path.dirname(__file__), "system_instructions.txt")
+    instructions_path = os.path.join(os.path.dirname(__file__), "prompts", "system_instructions.txt")
     with open(instructions_path, 'r', encoding='utf-8') as f:
         system_instructions = f.read()
     

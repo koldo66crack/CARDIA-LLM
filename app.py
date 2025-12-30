@@ -10,7 +10,7 @@ from src.conversation_manager import ChatSession
 def load_system_instructions():
     """Load system instructions for the chatbot from file."""
     instructions_path = os.path.join(
-        os.path.dirname(__file__), "src", "system_instructions.txt"
+        os.path.dirname(__file__), "src", "prompts", "system_instructions.txt"
     )
     with open(instructions_path, 'r', encoding='utf-8') as f:
         return f.read()
