@@ -56,3 +56,5 @@ SECURITY_SETUP.txt
 # OS
 Thumbs.db
 
+# Data
+data/debug/

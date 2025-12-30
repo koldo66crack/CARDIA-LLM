@@ -1,0 +1,26 @@
+Extract all text from this document page accurately and completely.
+
+Instructions:
+1. For tables:
+   - Preserve column structure using | as separator
+   - Keep each row on a single line
+   - Include column headers
+   - Example: "17 | A06ALCHL | Num | 8 | 128 | ALCOHOL (GM)"
+
+2. For regular text:
+   - Preserve paragraph structure
+   - Maintain line breaks where meaningful
+
+3. For diagrams or questionnaires:
+   - Describe the visual structure briefly
+   - If there are arrows between boxes, try to represent or describe the logical flow in your generated text
+   - Extract all visible text labels
+   - Note checkbox options or form fields
+
+4. Include everything:
+   - Headers and footers
+   - Page numbers
+   - All numbers and codes
+   - Variable names (like A06CALO, aaf06a)
+
+Return ONLY the extracted content. Do not add commentary or explanations.
