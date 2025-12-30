@@ -78,11 +78,12 @@ def extract_content_for_embedding(chunks, enrich_docs=False):
     
     content_strings = []
     for chunk in chunks:
-        content = chunk.get('content', '')
         
         if enrich_docs:
             # Prepend metadata for documentation chunks
             content = _enrich_doc_content(chunk)
+        else:
+            content = chunk.get('content', '')
         
         if content:
             content_strings.append(content)
@@ -115,12 +116,13 @@ def _enrich_doc_content(chunk):
     year = chunk.get('year', -1)
     if wave and year != -1:
         parts.append(f"Wave: {wave} (Year {year})")
-    elif wave:
-        parts.append(f"Wave: {wave}")
     
     doc_type = chunk.get('doc_type', '')
-    if doc_type:
-        parts.append(f"Type: {doc_type}")
+    if doc_type and doc_type != 'OTHER':
+        if doc_type == 'MOO':
+            parts.append(f"Type: Manuals of Operations") # MOO does not contain enough information for embedding
+        else:
+            parts.append(f"Type: {doc_type}")
     
     page = chunk.get('page', '')
     if page:

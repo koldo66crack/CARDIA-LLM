@@ -3,7 +3,7 @@
 
 import streamlit as st
 import os
-from src.llm import generate_response
+from src.pipeline import generate_response
 from src.conversation_manager import ChatSession
 
 
@@ -90,15 +90,48 @@ with st.sidebar:
         st.rerun()  # Refresh page to show empty chat
     
     st.markdown("## RAG Settings")
-    similarity_threshold = st.slider(
-        "Similarity Threshold",
+    
+    st.markdown("### Similarity Thresholds")
+    variable_threshold = st.slider(
+        "Variable Similarity Threshold",
         min_value=0.0,
         max_value=1.0,
         value=0.75,
         step=0.05,
-        help="Minimum similarity score for retrieving relevant variables (0.0-1.0)"
+        help="Minimum similarity score for retrieving relevant variables"
     )
-    st.session_state.similarity_threshold = similarity_threshold
+    st.session_state.variable_threshold = variable_threshold
+    
+    doc_threshold = st.slider(
+        "Documentation Similarity Threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=0.50,
+        step=0.05,
+        help="Minimum similarity score for retrieving documentation"
+    )
+    st.session_state.doc_threshold = doc_threshold
+    
+    st.markdown("### Chunk Limits")
+    max_variable_chunks = st.slider(
+        "Max Variable Chunks",
+        min_value=1,
+        max_value=100,
+        value=50,
+        step=1,
+        help="Maximum number of variables to retrieve"
+    )
+    st.session_state.max_variable_chunks = max_variable_chunks
+    
+    max_doc_chunks = st.slider(
+        "Max Documentation Pages",
+        min_value=1,
+        max_value=30,
+        value=15,
+        step=1,
+        help="Maximum number of documentation pages to retrieve"
+    )
+    st.session_state.max_doc_chunks = max_doc_chunks
 
 # ─────────────────────────────────────────────────────────────
 # SESSION STATE INITIALIZATION
@@ -107,10 +140,10 @@ with st.sidebar:
 # Without it, chat history would disappear on every interaction
 
 if "current_provider" not in st.session_state:
-    st.session_state.current_provider = "gemini"
+    st.session_state.current_provider = "openai"
 
 if "current_model" not in st.session_state:
-    st.session_state.current_model = "gemini-2.0-flash-exp"
+    st.session_state.current_model = "gpt-4o"
 
 if "chat_session" not in st.session_state:
     st.session_state.chat_session = initialize_chat_session(
@@ -145,19 +178,33 @@ if prompt := st.chat_input("Ask me about CARDIA variables..."):
     
     # Generate and display assistant response
     with st.chat_message("assistant"):
-        with st.spinner("Searching CARDIA database and generating response..."):
-            try:
-                response = generate_response(
-                    prompt, 
-                    st.session_state.chat_session,
-                    similarity_threshold=st.session_state.similarity_threshold
-                )
-                st.write(response)
-                
-                # Add assistant response to session state history
-                st.session_state.messages.append({"role": "assistant", "content": response})
-                
-            except Exception as e:
-                error_msg = f"Error generating response: {str(e)}"
-                st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        # Create a status container to show progress updates
+        status_container = st.empty()
+        response_container = st.empty()
+        
+        def update_status(message: str):
+            status_container.status(message, state="running")
+        
+        try:
+            response = generate_response(
+                prompt, 
+                st.session_state.chat_session,
+                variable_threshold=st.session_state.variable_threshold,
+                doc_threshold=st.session_state.doc_threshold,
+                max_variable_chunks=st.session_state.max_variable_chunks,
+                max_doc_chunks=st.session_state.max_doc_chunks,
+                status_callback=update_status
+            )
+            
+            # Clear the status and show response
+            status_container.empty()
+            response_container.write(response)
+            
+            # Add assistant response to session state history
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            
+        except Exception as e:
+            status_container.empty()
+            error_msg = f"Error generating response: {str(e)}"
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
