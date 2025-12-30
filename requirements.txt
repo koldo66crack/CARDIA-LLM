@@ -18,4 +18,4 @@ pillow>=9.0.0
 
 # DOC/DOCX extraction dependencies
 python-docx>=0.8.11
-pywin32>=305  # For .doc extraction via Word COM on Windows
+# pywin32>=305 - Windows-only, not available on Linux (Streamlit Cloud)
