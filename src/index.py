@@ -8,9 +8,14 @@ import os
 import numpy as np
 import faiss
 from sentence_transformers import SentenceTransformer
-from pathlib import Path
 import pickle
 from tqdm import tqdm
+
+# Default paths
+VARIABLES_JSONL = "data/processed/biolincc_data_dictionary.jsonl"
+DOCS_JSONL = "data/processed/cardia_documentation.jsonl"
+OUTPUT_DIR = "data/processed"
+DEFAULT_MODEL = "BAAI/bge-small-en-v1.5"
 
 
 def load_jsonl_data(jsonl_path):
@@ -18,10 +23,10 @@ def load_jsonl_data(jsonl_path):
     Load and parse JSONL data from processed file.
     
     Args:
-        jsonl_path (str): Path to the JSONL file
+        jsonl_path: Path to the JSONL file
         
     Returns:
-        list: List of chunk dictionaries
+        List of chunk dictionaries
     """
     print(f"Loading JSONL data from: {jsonl_path}")
     
@@ -42,38 +47,45 @@ def load_jsonl_data(jsonl_path):
     return chunks
 
 
-def initialize_embedding_model(model_name="BAAI/bge-small-en-v1.5"):
+def initialize_embedding_model(model_name=DEFAULT_MODEL):
     """
     Initialize the embedding model.
     
     Args:
-        model_name (str): Name of the sentence transformer model
+        model_name: Name of the sentence transformer model
         
     Returns:
-        SentenceTransformer: Initialized embedding model
+        Initialized SentenceTransformer model
     """
     print(f"Loading embedding model: {model_name}")
     model = SentenceTransformer(model_name)
-    print(f"Model loaded successfully. Embedding dimension: {model.get_sentence_embedding_dimension()}")
+    print(f"Model loaded. Embedding dimension: {model.get_sentence_embedding_dimension()}")
     return model
 
 
-def extract_content_for_embedding(chunks):
+def extract_content_for_embedding(chunks, enrich_docs=False):
     """
     Extract content fields from chunks for embedding.
     
     Args:
-        chunks (list): List of chunk dictionaries
+        chunks: List of chunk dictionaries
+        enrich_docs: If True, prepend metadata to doc content for better searchability
         
     Returns:
-        list: List of content strings
+        List of content strings
     """
     print("Extracting content fields for embedding...")
     
     content_strings = []
     for chunk in chunks:
-        if 'content' in chunk and chunk['content']:
-            content_strings.append(chunk['content'])
+        content = chunk.get('content', '')
+        
+        if enrich_docs:
+            # Prepend metadata for documentation chunks
+            content = _enrich_doc_content(chunk)
+        
+        if content:
+            content_strings.append(content)
         else:
             print(f"Warning: Chunk {chunk.get('id', 'unknown')} has no content field")
             content_strings.append("")  # Empty string for missing content
@@ -82,17 +94,57 @@ def extract_content_for_embedding(chunks):
     return content_strings
 
 
+def _enrich_doc_content(chunk):
+    """
+    Enrich documentation chunk content with metadata for better semantic search.
+    Prepends filename, wave, year, and doc_type to the content.
+    
+    Args:
+        chunk: Documentation chunk dictionary
+        
+    Returns:
+        Enriched content string
+    """
+    parts = []
+    
+    filename = chunk.get('filename', '')
+    if filename:
+        parts.append(f"Document: {filename}")
+    
+    wave = chunk.get('wave', '')
+    year = chunk.get('year', -1)
+    if wave and year != -1:
+        parts.append(f"Wave: {wave} (Year {year})")
+    elif wave:
+        parts.append(f"Wave: {wave}")
+    
+    doc_type = chunk.get('doc_type', '')
+    if doc_type:
+        parts.append(f"Type: {doc_type}")
+    
+    page = chunk.get('page', '')
+    if page:
+        parts.append(f"Page: {page}")
+    
+    # Add the actual content
+    content = chunk.get('content', '')
+    if content:
+        parts.append(f"Content: {content}")
+    
+    return " | ".join(parts)
+
+
 def generate_embeddings(model, content_strings, batch_size=32):
     """
     Generate embeddings for all content strings.
     
     Args:
-        model (SentenceTransformer): Embedding model
-        content_strings (list): List of content strings
-        batch_size (int): Batch size for processing
+        model: SentenceTransformer embedding model
+        content_strings: List of content strings
+        batch_size: Batch size for processing
         
     Returns:
-        np.ndarray: Array of embeddings
+        numpy array of embeddings
     """
     print(f"Generating embeddings for {len(content_strings)} content strings...")
     print(f"Using batch size: {batch_size}\n")
@@ -103,16 +155,9 @@ def generate_embeddings(model, content_strings, batch_size=32):
     
     for i in tqdm(batch_indices, desc="Embedding batches", unit="batch"):
         batch = content_strings[i:i + batch_size]
-        
-        # Generate embeddings for this batch
-        batch_embeddings = model.encode(
-            batch,
-            convert_to_numpy=True
-        )
-        
+        batch_embeddings = model.encode(batch, convert_to_numpy=True)
         all_embeddings.append(batch_embeddings)
     
-    # Combine all embeddings
     embeddings = np.vstack(all_embeddings)
     print(f"\nGenerated embeddings with shape: {embeddings.shape}")
     return embeddings
@@ -123,14 +168,13 @@ def build_faiss_index(embeddings):
     Build FAISS index with embeddings.
     
     Args:
-        embeddings (np.ndarray): Array of embeddings
+        embeddings: numpy array of embeddings
         
     Returns:
-        faiss.Index: FAISS index
+        FAISS index
     """
     print("Building FAISS index...")
     
-    # Get embedding dimension
     dimension = embeddings.shape[1]
     print(f"Embedding dimension: {dimension}")
     
@@ -147,43 +191,45 @@ def build_faiss_index(embeddings):
     return index
 
 
-
-
-def save_index_and_metadata(index, metadata, output_dir="data/processed", model="BAAI/bge-small-en-v1.5"):
+def save_index_and_metadata(index, metadata, output_dir=OUTPUT_DIR, prefix="", model_name=DEFAULT_MODEL):
     """
     Save FAISS index and metadata to disk.
     
     Args:
-        index (faiss.Index): FAISS index
-        metadata (list): Metadata mapping
-        output_dir (str): Output directory
+        index: FAISS index
+        metadata: List of metadata chunks
+        output_dir: Output directory
+        prefix: Prefix for output files (e.g., "docs_" for documentation index)
+        model_name: Name of the embedding model used
+        
+    Returns:
+        Tuple of (index_path, metadata_path, info_path)
     """
     print(f"Saving index and metadata to: {output_dir}")
-    
-    # Create output directory if it doesn't exist
     os.makedirs(output_dir, exist_ok=True)
     
+    # Build file paths with optional prefix
+    index_path = os.path.join(output_dir, f"{prefix}faiss_index.bin")
+    metadata_path = os.path.join(output_dir, f"{prefix}metadata.pkl")
+    info_path = os.path.join(output_dir, f"{prefix}index_info.json")
+    
     # Save FAISS index
-    index_path = os.path.join(output_dir, "faiss_index.bin")
     faiss.write_index(index, index_path)
     print(f"FAISS index saved to: {index_path}")
     
     # Save metadata
-    metadata_path = os.path.join(output_dir, "metadata.pkl")
     with open(metadata_path, 'wb') as f:
         pickle.dump(metadata, f)
     print(f"Metadata saved to: {metadata_path}")
     
     # Save index info
-    info_path = os.path.join(output_dir, "index_info.json")
     info = {
         "total_vectors": index.ntotal,
         "embedding_dimension": index.d,
         "index_type": "IndexFlatIP",
         "similarity_metric": "cosine",
-        "model_name": model
+        "model_name": model_name
     }
-    
     with open(info_path, 'w', encoding='utf-8') as f:
         json.dump(info, f, indent=2)
     print(f"Index info saved to: {info_path}")
@@ -191,51 +237,51 @@ def save_index_and_metadata(index, metadata, output_dir="data/processed", model=
     return index_path, metadata_path, info_path
 
 
-
-
-def build_index_from_jsonl(jsonl_path, output_dir="data/processed", model_name="BAAI/bge-small-en-v1.5"):
+def build_index(jsonl_path, output_dir=OUTPUT_DIR, prefix="", model_name=DEFAULT_MODEL):
     """
-    Main function to build index from JSONL file.
+    Build index from a JSONL file.
     
     Args:
-        jsonl_path (str): Path to JSONL file
-        output_dir (str): Output directory for index files
-        model_name (str): Name of embedding model
+        jsonl_path: Path to JSONL file
+        output_dir: Output directory for index files
+        prefix: Prefix for output files (e.g., "docs_")
+        model_name: Name of embedding model
         
     Returns:
-        tuple: (index, metadata, model)
+        Tuple of (index, metadata, model)
     """
+    is_docs = prefix == "docs_"
+    index_type = "DOCUMENTATION" if is_docs else "VARIABLES"
+    
     print("=" * 60)
-    print("BUILDING VECTOR INDEX")
+    print(f"BUILDING {index_type} INDEX")
     print("=" * 60)
     
     # Step 1: Load JSONL data
-    print("\n[STEP 1/6] Loading JSONL data...")
+    print("\n[STEP 1/5] Loading JSONL data...")
     chunks = load_jsonl_data(jsonl_path)
     
     # Step 2: Initialize embedding model
-    print("\n[STEP 2/6] Initializing embedding model...")
+    print("\n[STEP 2/5] Initializing embedding model...")
     model = initialize_embedding_model(model_name)
     
-    # Step 3: Extract content for embedding
-    print("\n[STEP 3/6] Extracting content fields...")
-    content_strings = extract_content_for_embedding(chunks)
+    # Step 3: Extract content for embedding (enrich docs with metadata)
+    print("\n[STEP 3/5] Extracting content fields...")
+    content_strings = extract_content_for_embedding(chunks, enrich_docs=is_docs)
     
     # Step 4: Generate embeddings
-    print("\n[STEP 4/6] Generating embeddings...")
-    print("This is the longest step - please wait...")
+    print("\n[STEP 4/5] Generating embeddings...")
     embeddings = generate_embeddings(model, content_strings)
     
-    # Step 5: Build FAISS index
-    print("\n[STEP 5/6] Building FAISS index...")
+    # Step 5: Build and save FAISS index
+    print("\n[STEP 5/5] Building and saving FAISS index...")
     index = build_faiss_index(embeddings)
-
-    # Step 6: Save index and metadata
-    print("\n[STEP 6/6] Saving index and metadata...")
-    index_path, metadata_path, info_path = save_index_and_metadata(index, chunks, output_dir)
+    index_path, metadata_path, info_path = save_index_and_metadata(
+        index, chunks, output_dir, prefix, model_name
+    )
     
-    print("=" * 60)
-    print("INDEX BUILDING COMPLETE")
+    print("\n" + "=" * 60)
+    print(f"{index_type} INDEX COMPLETE")
     print("=" * 60)
     print(f"Index file: {index_path}")
     print(f"Metadata file: {metadata_path}")
@@ -244,13 +290,48 @@ def build_index_from_jsonl(jsonl_path, output_dir="data/processed", model_name="
     return index, chunks, model
 
 
+def build_variables_index():
+    """Build index for BIOLINCC variables."""
+    if not os.path.exists(VARIABLES_JSONL):
+        print(f"Variables JSONL not found: {VARIABLES_JSONL}")
+        return None
+    return build_index(VARIABLES_JSONL, OUTPUT_DIR, prefix="")
+
+
+def build_docs_index():
+    """Build index for CARDIA documentation."""
+    if not os.path.exists(DOCS_JSONL):
+        print(f"Documentation JSONL not found: {DOCS_JSONL}")
+        return None
+    return build_index(DOCS_JSONL, OUTPUT_DIR, prefix="docs_")
+
+
+# Keep for backward compatibility
+def build_index_from_jsonl(jsonl_path, output_dir=OUTPUT_DIR, model_name=DEFAULT_MODEL):
+    """Backward compatible wrapper for build_index."""
+    return build_index(jsonl_path, output_dir, prefix="", model_name=model_name)
+
+
 if __name__ == "__main__":
-    # Build index from processed JSONL file
-    jsonl_path = "data/processed/biolincc_data_dictionary.jsonl"
+    import sys
     
-    if os.path.exists(jsonl_path):
-        index, metadata, model = build_index_from_jsonl(jsonl_path)
-        print(f"\nIndex building complete! Ready for retrieval.")
+    # Parse command line arguments
+    if len(sys.argv) > 1:
+        target = sys.argv[1].lower()
+        if target == "docs":
+            build_docs_index()
+        elif target == "variables":
+            build_variables_index()
+        elif target == "all":
+            build_variables_index()
+            print("\n")
+            build_docs_index()
+        else:
+            print(f"Unknown target: {target}")
+            print("Usage: python index.py [variables|docs|all]")
     else:
-        print(f"JSONL file not found: {jsonl_path}")
-        print("Please run preprocess.py first to create the JSONL file.")
+        # Default: build both
+        print("Building both indices...\n")
+        build_variables_index()
+        print("\n")
+        build_docs_index()

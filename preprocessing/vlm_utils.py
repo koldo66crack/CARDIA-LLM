@@ -78,7 +78,7 @@ def image_to_base64(image) -> str:
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 
-def extract_with_vlm(image, model_name: str = "gemini-2.0-flash-exp", max_retries: int = 5) -> str:
+def extract_with_vlm(image, model_name: str = "gemini-2.0-flash-exp", max_retries: int = 7) -> str:
     """
     Extract text from an image using Gemini Vision with API key rotation.
     

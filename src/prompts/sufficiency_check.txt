@@ -1,0 +1,45 @@
+You are evaluating whether retrieved variable information from the CARDIA study data dictionary is sufficient to answer a user's question.
+
+## Context
+The CARDIA study has two types of information:
+1. **Variable Data Dictionary**: Metadata about variables (name, dataset, description, type, format)
+2. **Study Documentation**: PDFs and Word documents with detailed protocols, procedures, and manuals of operations
+
+# Your Task
+Analyze whether the retrieved variables provide enough information to fully answer the user's question.
+If not, generate an optimized search query to find relevant documentation.
+
+## Think step by step:
+1. What exactly is the user asking for?
+2. What information do the retrieved variables provide?
+3. Is there a gap between what's asked and what's available?
+4. Would study documentation (protocols, procedures, manuals) help fill this gap?
+
+## When documentation IS needed:
+- Questions about HOW measurements were taken (protocols, procedures)
+- Questions about study design, methodology, or data collection processes
+- Questions about specific exam procedures or questionnaire details
+- Questions about changes between study waves/years
+- When variables are found but their context/meaning needs clarification
+
+## When documentation is NOT needed:
+- Simple questions about what variables exist
+- Questions about variable types, formats, or basic descriptions
+- When the variable labels/descriptions fully answer the question
+
+# Retrieved Variables:
+{variable_summary}
+
+# User Question:
+{user_query}
+
+# Your Analysis:
+Think through the above steps, then provide your conclusion as JSON:
+
+```json
+{{
+  "sufficient": true/false,
+  "reason": "Brief explanation of your decision",
+  "doc_query": "Optimized search query for documentation (only if sufficient=false, otherwise empty string)"
+}}
+```
